@@ -587,6 +587,9 @@
                 <button type="button" class="btn small secondary" id="searchBtn">
                   Search
                 </button>
+                <button type="button" class="btn small secondary" id="clearSearchBtn">
+                  Clear
+                </button>
               </div>
             </div>
             <div class="badge" id="summaryBadge">0 classmates stored</div>
@@ -623,6 +626,19 @@
         </div>
 
         <div id="mapGrid" class="map-grid"></div>
+
+        <!-- Town management (delete town) -->
+        <div style="margin-top:0.75rem; display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">
+          <select id="manageTownSelect" style="max-width:210px;">
+            <!-- Populated by JS -->
+          </select>
+          <button type="button" class="btn small secondary" id="deleteTownBtn">
+            Delete town
+          </button>
+          <span class="small-muted">
+            Only towns with no classmates can be deleted.
+          </span>
+        </div>
 
         <div class="footer-note">
           Data is stored only in <strong>your browser</strong> (localStorage).  
@@ -802,6 +818,9 @@
     const customTownInput = document.getElementById("customTown");
     const addTownBtn = document.getElementById("addTownBtn");
 
+    const manageTownSelect = document.getElementById("manageTownSelect");
+    const deleteTownBtn = document.getElementById("deleteTownBtn");
+
     const classmateForm = document.getElementById("classmateForm");
     const editIndexInput = document.getElementById("editIndex");
     const nameInput = document.getElementById("name");
@@ -815,6 +834,7 @@
 
     const searchInput = document.getElementById("searchInput");
     const searchBtn = document.getElementById("searchBtn");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
     const classmateListEl = document.getElementById("classmateList");
     const emptyListEl = document.getElementById("emptyList");
     const summaryBadge = document.getElementById("summaryBadge");
@@ -852,14 +872,27 @@
     });
 
     function initTownsDropdown() {
-      townSelect.innerHTML = '<option value="">Select town…</option>';
       const sorted = [...TOWNS].sort((a, b) => a.localeCompare(b));
+
+      // Main town dropdown (for classmates)
+      townSelect.innerHTML = '<option value="">Select town…</option>';
       sorted.forEach((t) => {
         const opt = document.createElement("option");
         opt.value = t;
         opt.textContent = t;
         townSelect.appendChild(opt);
       });
+
+      // Town management dropdown (for deleting towns)
+      if (manageTownSelect) {
+        manageTownSelect.innerHTML = '<option value="">Select town to delete…</option>';
+        sorted.forEach((t) => {
+          const opt = document.createElement("option");
+          opt.value = t;
+          opt.textContent = t;
+          manageTownSelect.appendChild(opt);
+        });
+      }
     }
 
     addTownBtn.addEventListener("click", () => {
@@ -882,6 +915,35 @@
       customTownInput.value = "";
       renderMap();
       alert(`Added "${formatted}" to the town list.`);
+    });
+
+    // Delete town logic
+    deleteTownBtn.addEventListener("click", () => {
+      const town = manageTownSelect.value;
+      if (!town) {
+        alert("Pick a town to delete.");
+        return;
+      }
+
+      const used = classmates.some((c) => c.town === town);
+      if (used) {
+        alert("You can't delete this town because at least one classmate is using it. Change or delete them first.");
+        return;
+      }
+
+      if (!confirm(`Remove "${town}" from the town list?`)) return;
+
+      TOWNS = TOWNS.filter((t) => t !== town);
+      saveTowns(TOWNS);
+
+      if (selectedTown === town) {
+        selectedTown = null;
+        mapStatus.textContent =
+          "No town selected. Yellow marks classmates that are near another classmate (≤5 km).";
+      }
+
+      initTownsDropdown();
+      renderMap();
     });
 
     function renderClassmateList() {
@@ -1145,6 +1207,16 @@
       }
     });
 
+    // Clear search
+    clearSearchBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      selectedTown = null;
+      mapStatus.textContent =
+        "No town selected. Yellow marks classmates that are near another classmate (≤5 km).";
+      renderClassmateList();
+      renderMap();
+    });
+
     demoBtn.addEventListener("click", () => {
       if (
         classmates.length > 0 &&
@@ -1274,6 +1346,7 @@
       importFileInput.value = "";
     });
 
+    // Init
     TOWNS = loadTowns();
     initTownsDropdown();
     renderClassmateList();
