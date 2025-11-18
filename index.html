@@ -340,7 +340,7 @@
       <div class="title">
         <h1>Kinkonnect</h1>
         <div class="subtitle">
-          See where your classmates are across Kenya 🌍 – town by town.
+          See where your classmates are across Kenya 🌍 – and who is near who.
         </div>
       </div>
       <div>
@@ -354,7 +354,9 @@
         <div class="card-header">
           <div>
             <div class="card-title">Add / edit classmate</div>
-            <div class="card-sub">Store name, phone, town and specific place. Add GPS for “near me”.</div>
+            <div class="card-sub">
+              Store name, phone, town and specific place. Add GPS to detect who's close.
+            </div>
           </div>
           <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
             <input type="file" id="importFile" accept="application/json" style="display:none;" />
@@ -439,7 +441,7 @@
           <div>
             <div class="card-title">Kenya town map</div>
             <div class="card-sub">
-              Tiles turn <span style="color:#22c55e;">green</span> where your classmates are. Yellow = near you.
+              Green = classmates in a town. Yellow = classmates in that town who have someone within 5 km.
             </div>
           </div>
           <div class="badge">
@@ -449,10 +451,9 @@
 
         <div class="map-header">
           <div class="map-status" id="mapStatus">
-            No town selected. Your location not set.
+            No town selected. Yellow marks classmates that are near another classmate (≤5 km).
           </div>
-          <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-            <button class="btn small secondary" id="locBtn" type="button">Use my location</button>
+          <div>
             <span class="danger-link" id="clearAllBtn">Clear all saved data</span>
           </div>
         </div>
@@ -462,7 +463,7 @@
         <div class="footer-note">
           Data is stored only in <strong>your browser</strong> (localStorage).  
           Use <strong>Export</strong> to download a backup file, and <strong>Import</strong> to load it later.  
-          For distance, classmates need coordinates (lat/lng), and you must set your location.
+          Proximity is calculated between classmates that have latitude and longitude.
         </div>
       </section>
     </div>
@@ -471,7 +472,6 @@
   <script>
     // ---------- CONFIG ----------
     const STORAGE_KEY = "kinkonnect-classmates-v1";
-    const MY_LOC_KEY = "kinkonnect-my-location-v1";
 
     // A list of Kenyan towns – you can edit this
     const TOWNS = [
@@ -501,29 +501,6 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     }
 
-    function loadMyLocation() {
-      try {
-        const raw = localStorage.getItem(MY_LOC_KEY);
-        if (!raw) return { lat: null, lng: null };
-        const obj = JSON.parse(raw);
-        if (
-          typeof obj === "object" &&
-          obj &&
-          typeof obj.lat === "number" &&
-          typeof obj.lng === "number"
-        ) {
-          return obj;
-        }
-        return { lat: null, lng: null };
-      } catch {
-        return { lat: null, lng: null };
-      }
-    }
-
-    function saveMyLocation(lat, lng) {
-      localStorage.setItem(MY_LOC_KEY, JSON.stringify({ lat, lng }));
-    }
-
     // Haversine distance in km between two coords
     function distanceKm(lat1, lon1, lat2, lon2) {
       const R = 6371;
@@ -539,10 +516,45 @@
       return R * c;
     }
 
+    // Compute nearest distance to any other classmate (pairwise)
+    function computeProximity() {
+      const n = classmates.length;
+      const prox = new Array(n);
+      for (let i = 0; i < n; i++) {
+        prox[i] = { nearestKm: null };
+      }
+
+      for (let i = 0; i < n; i++) {
+        const ci = classmates[i];
+        if (ci.lat == null || ci.lng == null) continue;
+        const lat1 = parseFloat(ci.lat);
+        const lng1 = parseFloat(ci.lng);
+        if (!Number.isFinite(lat1) || !Number.isFinite(lng1)) continue;
+
+        for (let j = i + 1; j < n; j++) {
+          const cj = classmates[j];
+          if (cj.lat == null || cj.lng == null) continue;
+          const lat2 = parseFloat(cj.lat);
+          const lng2 = parseFloat(cj.lng);
+          if (!Number.isFinite(lat2) || !Number.isFinite(lng2)) continue;
+
+          const d = distanceKm(lat1, lng1, lat2, lng2);
+          if (!Number.isFinite(d)) continue;
+
+          if (prox[i].nearestKm === null || d < prox[i].nearestKm) {
+            prox[i].nearestKm = d;
+          }
+          if (prox[j].nearestKm === null || d < prox[j].nearestKm) {
+            prox[j].nearestKm = d;
+          }
+        }
+      }
+      return prox;
+    }
+
     // ---------- STATE ----------
     let classmates = loadClassmates();
     let selectedTown = null;
-    let myLocation = loadMyLocation();
 
     // ---------- ELEMENTS ----------
     const townSelect = document.getElementById("town");
@@ -566,7 +578,6 @@
     const mapStatus = document.getElementById("mapStatus");
     const clearAllBtn = document.getElementById("clearAllBtn");
     const demoBtn = document.getElementById("demoBtn");
-    const locBtn = document.getElementById("locBtn");
 
     const importBtn = document.getElementById("importBtn");
     const exportBtn = document.getElementById("exportBtn");
@@ -586,6 +597,7 @@
     // ---------- RENDER CLASSMATE LIST ----------
     function renderClassmateList() {
       const term = searchInput.value.trim().toLowerCase();
+      const proximity = computeProximity();
 
       let filtered = classmates;
       if (selectedTown) {
@@ -619,26 +631,15 @@
         item.className = "classmate";
 
         const indexInFull = classmates.indexOf(c);
+        const prox = proximity[indexInFull];
 
         let distanceText = "";
-        let isNearby = false;
 
-        if (
-          myLocation.lat !== null &&
-          myLocation.lng !== null &&
-          c.lat !== null &&
-          c.lng !== null
-        ) {
-          const clat = parseFloat(c.lat);
-          const clng = parseFloat(c.lng);
-          if (Number.isFinite(clat) && Number.isFinite(clng)) {
-            const d = distanceKm(myLocation.lat, myLocation.lng, clat, clng);
-            const dRounded = Math.round(d * 10) / 10;
-            distanceText = dRounded + " km from you";
-            if (d <= 5) {
-              isNearby = true;
-              item.classList.add("nearby");
-            }
+        if (prox && prox.nearestKm !== null) {
+          const dRounded = Math.round(prox.nearestKm * 10) / 10;
+          distanceText = "Nearest classmate: " + dRounded + " km away";
+          if (prox.nearestKm <= 5) {
+            item.classList.add("nearby");
           }
         }
 
@@ -775,19 +776,17 @@
         counts[c.town] = (counts[c.town] || 0) + 1;
       });
 
+      const proximity = computeProximity();
       const nearbyCounts = {};
-      if (myLocation.lat !== null && myLocation.lng !== null) {
-        classmates.forEach((c) => {
-          if (!c.town || c.lat == null || c.lng == null) return;
-          const clat = parseFloat(c.lat);
-          const clng = parseFloat(c.lng);
-          if (!Number.isFinite(clat) || !Number.isFinite(clng)) return;
-          const d = distanceKm(myLocation.lat, myLocation.lng, clat, clng);
-          if (d <= 5) {
-            nearbyCounts[c.town] = (nearbyCounts[c.town] || 0) + 1;
-          }
-        });
-      }
+
+      classmates.forEach((c, idx) => {
+        if (!c.town) return;
+        const info = proximity[idx];
+        if (!info || info.nearestKm === null) return;
+        if (info.nearestKm <= 5) {
+          nearbyCounts[c.town] = (nearbyCounts[c.town] || 0) + 1;
+        }
+      });
 
       TOWNS.forEach((town) => {
         const count = counts[town] || 0;
@@ -809,8 +808,8 @@
             nearbyCount > 0
               ? " • " +
                 (nearbyCount === 1
-                  ? "1 near you (≤5 km)"
-                  : nearbyCount + " near you (≤5 km)")
+                  ? "1 has someone within 5 km"
+                  : nearbyCount + " have someone within 5 km")
               : ""
           }</span>
         `;
@@ -819,9 +818,7 @@
           if (selectedTown === town) {
             selectedTown = null;
             mapStatus.textContent =
-              myLocation.lat !== null && myLocation.lng !== null
-                ? "No town selected. Your location is set."
-                : "No town selected. Your location not set.";
+              "No town selected. Yellow marks classmates that are near another classmate (≤5 km).";
           } else {
             selectedTown = town;
             const num = counts[town] || 0;
@@ -842,15 +839,14 @@
     clearAllBtn.addEventListener("click", () => {
       if (
         confirm(
-          "This will delete ALL saved classmates and your saved location from this browser. Are you sure?"
+          "This will delete ALL saved classmates from this browser. Are you sure?"
         )
       ) {
         classmates = [];
         saveClassmates(classmates);
-        localStorage.removeItem(MY_LOC_KEY);
-        myLocation = { lat: null, lng: null };
         selectedTown = null;
-        mapStatus.textContent = "No town selected. Your location not set.";
+        mapStatus.textContent =
+          "No town selected. Yellow marks classmates that are near another classmate (≤5 km).";
         renderClassmateList();
         renderMap();
       }
@@ -885,11 +881,11 @@
         {
           name: "Brian Otieno",
           phone: "0722 111 222",
-          town: "Kisumu",
-          place: "Milimani",
+          town: "Nairobi",
+          place: "Upper Hill",
           notes: "Loves basketball and coding.",
-          lat: -0.0917,
-          lng: 34.7679
+          lat: -1.2950,
+          lng: 36.8300
         },
         {
           name: "Grace Wanjiru",
@@ -980,9 +976,7 @@
           saveClassmates(classmates);
           selectedTown = null;
           mapStatus.textContent =
-            myLocation.lat !== null && myLocation.lng !== null
-              ? "No town selected. Your location is set."
-              : "No town selected. Your location not set.";
+            "No town selected. Yellow marks classmates that are near another classmate (≤5 km).";
           renderClassmateList();
           renderMap();
           alert("Import successful!");
@@ -995,42 +989,10 @@
       importFileInput.value = "";
     });
 
-    // ---------- LOCATION BUTTON ----------
-    locBtn.addEventListener("click", () => {
-      if (!("geolocation" in navigator)) {
-        alert("Your browser does not support location.");
-        return;
-      }
-      locBtn.disabled = true;
-      locBtn.textContent = "Getting location...";
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          myLocation = { lat: latitude, lng: longitude };
-          saveMyLocation(latitude, longitude);
-          mapStatus.textContent =
-            "Your location is set. Classmates within 5 km are highlighted in yellow.";
-          locBtn.textContent = "Use my location";
-          locBtn.disabled = false;
-          renderClassmateList();
-          renderMap();
-        },
-        (err) => {
-          alert("Could not get your location: " + (err.message || "Unknown error"));
-          locBtn.textContent = "Use my location";
-          locBtn.disabled = false;
-        }
-      );
-    });
-
     // ---------- INIT ----------
     initTowns();
     renderClassmateList();
     renderMap();
-    if (myLocation.lat !== null && myLocation.lng !== null) {
-      mapStatus.textContent =
-        "No town selected. Your location is already set – nearby classmates (≤5 km) are highlighted in yellow.";
-    }
   </script>
 </body>
 </html>
