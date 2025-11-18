@@ -215,6 +215,11 @@
       font-size: 0.82rem;
     }
 
+    .classmate.nearby {
+      border-color: #facc15;
+      box-shadow: 0 0 0 1px #facc15;
+    }
+
     .classmate-header {
       display: flex;
       justify-content: space-between;
@@ -242,17 +247,6 @@
       font-size: 0.78rem;
       color: #cbd5f5;
       margin-top: 0.15rem;
-    }
-
-    .tag {
-      display: inline-flex;
-      padding: 0.1rem 0.35rem;
-      border-radius: 999px;
-      background: #111827;
-      font-size: 0.72rem;
-      color: #9ca3af;
-      border: 1px solid #1f2937;
-      margin-top: 0.2rem;
     }
 
     .empty {
@@ -303,12 +297,14 @@
       box-shadow: 0 10px 25px rgba(34,197,94,0.5);
     }
 
-    .town-tile.selected {
-      outline: 1px solid #e5e7eb;
+    .town-tile.nearby-town {
+      background: linear-gradient(135deg, #451a03, #78350f);
+      border-color: #facc15;
+      box-shadow: 0 10px 25px rgba(250,204,21,0.5);
     }
 
-    .town-tile.has-people .town-count {
-      color: #bbf7d0;
+    .town-tile.selected {
+      outline: 1px solid #e5e7eb;
     }
 
     .map-header {
@@ -358,7 +354,7 @@
         <div class="card-header">
           <div>
             <div class="card-title">Add / edit classmate</div>
-            <div class="card-sub">Store name, phone, town and specific place.</div>
+            <div class="card-sub">Store name, phone, town and specific place. Add GPS for “near me”.</div>
           </div>
           <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
             <input type="file" id="importFile" accept="application/json" style="display:none;" />
@@ -398,6 +394,17 @@
             <input id="place" type="text" placeholder="Estate, school, street..." />
           </div>
 
+          <div class="field-row" style="margin-top:0.55rem;">
+            <div>
+              <label for="lat">Latitude (optional)</label>
+              <input id="lat" type="text" placeholder="-1.286389" />
+            </div>
+            <div>
+              <label for="lng">Longitude (optional)</label>
+              <input id="lng" type="text" placeholder="36.817223" />
+            </div>
+          </div>
+
           <div style="margin-top:0.55rem;">
             <label for="notes">Notes (optional)</label>
             <textarea id="notes" placeholder="Anything extra – uni, job, etc."></textarea>
@@ -432,7 +439,7 @@
           <div>
             <div class="card-title">Kenya town map</div>
             <div class="card-sub">
-              Tiles turn <span style="color:#22c55e;">green</span> where your classmates are.
+              Tiles turn <span style="color:#22c55e;">green</span> where your classmates are. Yellow = near you.
             </div>
           </div>
           <div class="badge">
@@ -442,9 +449,10 @@
 
         <div class="map-header">
           <div class="map-status" id="mapStatus">
-            No town selected.
+            No town selected. Your location not set.
           </div>
-          <div>
+          <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+            <button class="btn small secondary" id="locBtn" type="button">Use my location</button>
             <span class="danger-link" id="clearAllBtn">Clear all saved data</span>
           </div>
         </div>
@@ -453,7 +461,8 @@
 
         <div class="footer-note">
           Data is stored only in <strong>your browser</strong> (localStorage).  
-          Use <strong>Export</strong> to download a backup file, and <strong>Import</strong> to load it later.
+          Use <strong>Export</strong> to download a backup file, and <strong>Import</strong> to load it later.  
+          For distance, classmates need coordinates (lat/lng), and you must set your location.
         </div>
       </section>
     </div>
@@ -462,6 +471,7 @@
   <script>
     // ---------- CONFIG ----------
     const STORAGE_KEY = "kinkonnect-classmates-v1";
+    const MY_LOC_KEY = "kinkonnect-my-location-v1";
 
     // A list of Kenyan towns – you can edit this
     const TOWNS = [
@@ -475,7 +485,7 @@
       "Chuka", "Kapsabet"
     ];
 
-    // ---------- STORAGE HELPERS ----------
+    // ---------- HELPERS ----------
     function loadClassmates() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -491,9 +501,48 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     }
 
+    function loadMyLocation() {
+      try {
+        const raw = localStorage.getItem(MY_LOC_KEY);
+        if (!raw) return { lat: null, lng: null };
+        const obj = JSON.parse(raw);
+        if (
+          typeof obj === "object" &&
+          obj &&
+          typeof obj.lat === "number" &&
+          typeof obj.lng === "number"
+        ) {
+          return obj;
+        }
+        return { lat: null, lng: null };
+      } catch {
+        return { lat: null, lng: null };
+      }
+    }
+
+    function saveMyLocation(lat, lng) {
+      localStorage.setItem(MY_LOC_KEY, JSON.stringify({ lat, lng }));
+    }
+
+    // Haversine distance in km between two coords
+    function distanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) *
+          Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
     // ---------- STATE ----------
     let classmates = loadClassmates();
     let selectedTown = null;
+    let myLocation = loadMyLocation();
 
     // ---------- ELEMENTS ----------
     const townSelect = document.getElementById("town");
@@ -503,6 +552,8 @@
     const phoneInput = document.getElementById("phone");
     const placeInput = document.getElementById("place");
     const notesInput = document.getElementById("notes");
+    const latInput = document.getElementById("lat");
+    const lngInput = document.getElementById("lng");
     const saveBtn = document.getElementById("saveBtn");
     const cancelEditBtn = document.getElementById("cancelEditBtn");
 
@@ -515,6 +566,7 @@
     const mapStatus = document.getElementById("mapStatus");
     const clearAllBtn = document.getElementById("clearAllBtn");
     const demoBtn = document.getElementById("demoBtn");
+    const locBtn = document.getElementById("locBtn");
 
     const importBtn = document.getElementById("importBtn");
     const exportBtn = document.getElementById("exportBtn");
@@ -568,6 +620,28 @@
 
         const indexInFull = classmates.indexOf(c);
 
+        let distanceText = "";
+        let isNearby = false;
+
+        if (
+          myLocation.lat !== null &&
+          myLocation.lng !== null &&
+          c.lat !== null &&
+          c.lng !== null
+        ) {
+          const clat = parseFloat(c.lat);
+          const clng = parseFloat(c.lng);
+          if (Number.isFinite(clat) && Number.isFinite(clng)) {
+            const d = distanceKm(myLocation.lat, myLocation.lng, clat, clng);
+            const dRounded = Math.round(d * 10) / 10;
+            distanceText = dRounded + " km from you";
+            if (d <= 5) {
+              isNearby = true;
+              item.classList.add("nearby");
+            }
+          }
+        }
+
         item.innerHTML = `
           <div class="classmate-header">
             <div>
@@ -579,6 +653,11 @@
           ${
             c.place
               ? `<div class="classmate-detail">📍 ${c.place}</div>`
+              : ""
+          }
+          ${
+            distanceText
+              ? `<div class="classmate-detail">📏 ${distanceText}</div>`
               : ""
           }
           ${
@@ -609,11 +688,15 @@
 
       if (action === "edit") {
         editIndexInput.value = index;
-        nameInput.value = c.name;
-        phoneInput.value = c.phone;
+        nameInput.value = c.name || "";
+        phoneInput.value = c.phone || "";
         townSelect.value = c.town || "";
         placeInput.value = c.place || "";
         notesInput.value = c.notes || "";
+        latInput.value =
+          c.lat !== null && c.lat !== undefined ? String(c.lat) : "";
+        lngInput.value =
+          c.lng !== null && c.lng !== undefined ? String(c.lng) : "";
         saveBtn.textContent = "Update classmate";
         cancelEditBtn.style.display = "inline-flex";
         nameInput.focus();
@@ -638,12 +721,23 @@
     classmateForm.addEventListener("submit", (e) => {
       e.preventDefault();
 
+      const latVal = latInput.value.trim();
+      const lngVal = lngInput.value.trim();
+      const latNum = parseFloat(latVal);
+      const lngNum = parseFloat(lngVal);
+      const lat =
+        latVal && Number.isFinite(latNum) ? latNum : null;
+      const lng =
+        lngVal && Number.isFinite(lngNum) ? lngNum : null;
+
       const newC = {
         name: nameInput.value.trim(),
         phone: phoneInput.value.trim(),
         town: townSelect.value,
         place: placeInput.value.trim(),
-        notes: notesInput.value.trim()
+        notes: notesInput.value.trim(),
+        lat,
+        lng
       };
 
       if (!newC.name || !newC.phone || !newC.town) {
@@ -681,12 +775,28 @@
         counts[c.town] = (counts[c.town] || 0) + 1;
       });
 
+      const nearbyCounts = {};
+      if (myLocation.lat !== null && myLocation.lng !== null) {
+        classmates.forEach((c) => {
+          if (!c.town || c.lat == null || c.lng == null) return;
+          const clat = parseFloat(c.lat);
+          const clng = parseFloat(c.lng);
+          if (!Number.isFinite(clat) || !Number.isFinite(clng)) return;
+          const d = distanceKm(myLocation.lat, myLocation.lng, clat, clng);
+          if (d <= 5) {
+            nearbyCounts[c.town] = (nearbyCounts[c.town] || 0) + 1;
+          }
+        });
+      }
+
       TOWNS.forEach((town) => {
         const count = counts[town] || 0;
+        const nearbyCount = nearbyCounts[town] || 0;
         const tile = document.createElement("button");
         tile.type = "button";
         tile.className = "town-tile";
         if (count > 0) tile.classList.add("has-people");
+        if (nearbyCount > 0) tile.classList.add("nearby-town");
         if (selectedTown === town) tile.classList.add("selected");
 
         tile.innerHTML = `
@@ -695,13 +805,23 @@
             count === 0 ? "No one here (yet)" :
             count === 1 ? "1 classmate here" :
             count + " classmates here"
+          }${
+            nearbyCount > 0
+              ? " • " +
+                (nearbyCount === 1
+                  ? "1 near you (≤5 km)"
+                  : nearbyCount + " near you (≤5 km)")
+              : ""
           }</span>
         `;
 
         tile.addEventListener("click", () => {
           if (selectedTown === town) {
             selectedTown = null;
-            mapStatus.textContent = "No town selected.";
+            mapStatus.textContent =
+              myLocation.lat !== null && myLocation.lng !== null
+                ? "No town selected. Your location is set."
+                : "No town selected. Your location not set.";
           } else {
             selectedTown = town;
             const num = counts[town] || 0;
@@ -722,13 +842,15 @@
     clearAllBtn.addEventListener("click", () => {
       if (
         confirm(
-          "This will delete ALL saved classmates from this browser. Are you sure?"
+          "This will delete ALL saved classmates and your saved location from this browser. Are you sure?"
         )
       ) {
         classmates = [];
         saveClassmates(classmates);
+        localStorage.removeItem(MY_LOC_KEY);
+        myLocation = { lat: null, lng: null };
         selectedTown = null;
-        mapStatus.textContent = "No town selected.";
+        mapStatus.textContent = "No town selected. Your location not set.";
         renderClassmateList();
         renderMap();
       }
@@ -756,35 +878,45 @@
           phone: "0712 345 678",
           town: "Nairobi",
           place: "South B – Golden Gate",
-          notes: "Wants to study medicine at UoN."
+          notes: "Wants to study medicine at UoN.",
+          lat: -1.3000,
+          lng: 36.8500
         },
         {
           name: "Brian Otieno",
           phone: "0722 111 222",
           town: "Kisumu",
           place: "Milimani",
-          notes: "Loves basketball and coding."
+          notes: "Loves basketball and coding.",
+          lat: -0.0917,
+          lng: 34.7679
         },
         {
           name: "Grace Wanjiru",
           phone: "0790 555 444",
           town: "Nakuru",
           place: "Shabaab",
-          notes: "Gap year then uni."
+          notes: "Gap year then uni.",
+          lat: -0.3031,
+          lng: 36.0800
         },
         {
           name: "Kevin Kiptoo",
           phone: "0700 000 999",
           town: "Eldoret",
           place: "Kapsoya",
-          notes: "Training for athletics."
+          notes: "Training for athletics.",
+          lat: 0.5204,
+          lng: 35.2698
         },
         {
           name: "Fatma Ahmed",
           phone: "0733 222 333",
           town: "Mombasa",
           place: "Nyali",
-          notes: "Into photography."
+          notes: "Into photography.",
+          lat: -4.0435,
+          lng: 39.6682
         }
       ];
 
@@ -847,7 +979,10 @@
           classmates = imported;
           saveClassmates(classmates);
           selectedTown = null;
-          mapStatus.textContent = "No town selected.";
+          mapStatus.textContent =
+            myLocation.lat !== null && myLocation.lng !== null
+              ? "No town selected. Your location is set."
+              : "No town selected. Your location not set.";
           renderClassmateList();
           renderMap();
           alert("Import successful!");
@@ -860,11 +995,42 @@
       importFileInput.value = "";
     });
 
+    // ---------- LOCATION BUTTON ----------
+    locBtn.addEventListener("click", () => {
+      if (!("geolocation" in navigator)) {
+        alert("Your browser does not support location.");
+        return;
+      }
+      locBtn.disabled = true;
+      locBtn.textContent = "Getting location...";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          myLocation = { lat: latitude, lng: longitude };
+          saveMyLocation(latitude, longitude);
+          mapStatus.textContent =
+            "Your location is set. Classmates within 5 km are highlighted in yellow.";
+          locBtn.textContent = "Use my location";
+          locBtn.disabled = false;
+          renderClassmateList();
+          renderMap();
+        },
+        (err) => {
+          alert("Could not get your location: " + (err.message || "Unknown error"));
+          locBtn.textContent = "Use my location";
+          locBtn.disabled = false;
+        }
+      );
+    });
+
     // ---------- INIT ----------
     initTowns();
     renderClassmateList();
     renderMap();
+    if (myLocation.lat !== null && myLocation.lng !== null) {
+      mapStatus.textContent =
+        "No town selected. Your location is already set – nearby classmates (≤5 km) are highlighted in yellow.";
+    }
   </script>
 </body>
 </html>
-
