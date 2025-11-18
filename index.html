@@ -424,6 +424,49 @@
     body.theme-light .btn.secondary:hover {
       background: #e5e7eb;
     }
+
+    /* EXTRA MOBILE TWEAKS */
+    @media (max-width: 600px) {
+      .app {
+        padding: 1rem 0.75rem 2rem;
+      }
+
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .title svg {
+        width: 180px;
+        height: auto;
+      }
+
+      input[type="text"],
+      input[type="tel"],
+      select,
+      textarea {
+        font-size: 0.95rem;
+        padding: 0.55rem 0.6rem;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .controls-top {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .search > div {
+        flex-direction: column;
+      }
+
+      .map-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      }
+    }
   </style>
 </head>
 <body>
@@ -1084,7 +1127,7 @@
       }
     });
 
-    // Live filter while typing (optional but nice)
+    // Live filter while typing
     searchInput.addEventListener("input", () => {
       renderClassmateList();
     });
