@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>People Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f5fb;
+      color: #111827;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.8rem;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr);
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 0.75rem;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      box-sizing: border-box;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px #6366f1;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      margin-bottom: 0.15rem;
+      color: #374151;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      border: none;
+      cursor: pointer;
+      background: #4f46e5;
+      color: #ffffff;
+      font-weight: 500;
+      transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
+    }
+
+    .btn:hover {
+      background: #4338ca;
+      box-shadow: 0 8px 16px rgba(79, 70, 229, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .btn.secondary {
+      background: #e5e7eb;
+      color: #111827;
+      box-shadow: none;
+    }
+
+    .btn.secondary:hover {
+      background: #d1d5db;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.4rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #eef2ff;
+      color: #4338ca;
+      margin-left: 0.35rem;
+    }
+
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .list-meta {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .people-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 60vh;
+      overflow: auto;
+      padding-right: 0.25rem;
+    }
+
+    .person {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.4fr);
+      gap: 0.6rem;
+      align-items: flex-start;
+      padding: 0.55rem 0.65rem;
+      border-radius: 0.6rem;
+      background: #f9fafb;
+      border: 1px solid transparent;
+      font-size: 0.83rem;
+    }
+
+    .person:nth-child(odd) {
+      background: #f3f4ff;
+    }
+
+    .person:hover {
+      border-color: #c7d2fe;
+    }
+
+    .person-name {
+      font-weight: 600;
+      margin-bottom: 0.1rem;
+    }
+
+    .person-relation {
+      font-size: 0.78rem;
+      color: #6b7280;
+    }
+
+    .person-location {
+      font-size: 0.78rem;
+      color: #4b5563;
+      margin-bottom: 0.15rem;
+    }
+
+    .person-notes {
+      font-size: 0.78rem;
+      color: #4b5563;
+    }
+
+    .badge {
+      display: inline-flex;
+      padding: 0.12rem 0.35rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #fee2e2;
+      color: #b91c1c;
+      margin-right: 0.25rem;
+    }
+
+    .badge.ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .tag {
+      display: inline-flex;
+      padding: 0.12rem 0.35rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #e5e7eb;
+      color: #374151;
+      margin: 0.1rem 0.15rem 0 0;
+    }
+
+    .empty-state {
+      font-size: 0.85rem;
+      color: #6b7280;
+      text-align: center;
+      padding: 1rem 0.5rem;
+    }
+
+    .small {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 0.5rem;
+    }
+
+    .danger {
+      color: #b91c1c;
+      cursor: pointer;
+      font-size: 0.75rem;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>People Tracker</h1>
+    <div class="subtitle">
+      Keep track of family and friends, when you last spoke, and what matters to them.
+    </div>
+
+    <div class="layout">
+      <!-- Left: list -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Your people</div>
+        </div>
+
+        <div class="controls">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search by name, relation, city, tags..."
+          />
+          <select id="sortSelect">
+            <option value="name">Sort: Name (A–Z)</option>
+            <option value="lastContactRecent">Sort: Last contact (recent first)</option>
+            <option value="lastContactOld">Sort: Last contact (oldest first)</option>
+          </select>
+        </div>
+
+        <div class="list-header">
+          <div class="list-meta" id="countMeta">0 people</div>
+          <span class="small">Stored only in this browser using localStorage</span>
+        </div>
+
+        <div id="peopleList" class="people-list"></div>
+        <div id="emptyState" class="empty-state" style="display:none;">
+          No people yet. Add someone on the right to get started.
+        </div>
+
+        <div class="small">
+          <span class="danger" id="resetDataBtn">Clear all data</span>
+        </div>
+      </div>
+
+      <!-- Right: form -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Add / update person</div>
+        </div>
+
+        <form id="personForm">
+          <input type="hidden" id="editIndex" />
+
+          <div>
+            <label for="name">Name *</label>
+            <input id="name" type="text" required />
+          </div>
+
+          <div class="field-row" style="margin-top:0.5rem;">
+            <div>
+              <label for="relation">How you know them</label>
+              <input id="relation" type="text" placeholder="Cousin, friend, colleague..." />
+            </div>
+            <div>
+              <label for="location">Where they are</label>
+              <input id="location" type="text" placeholder="City, Country" />
+            </div>
+          </div>
+
+          <div class="field-row" style="margin-top:0.5rem;">
+            <div>
+              <label for="lastContact">Last time you spoke</label>
+              <input id="lastContact" type="date" />
+            </div>
+            <div>
+              <label for="tags">Tags</label>
+              <input id="tags" type="text" placeholder="family, work, close..." />
+            </div>
+          </div>
+
+          <div style="margin-top:0.5rem;">
+            <label for="notes">Notes</label>
+            <textarea id="notes" placeholder="Important details, follow-ups, birthdays, etc."></textarea>
+          </div>
+
+          <div style="margin-top:0.8rem; display:flex; gap:0.5rem;">
+            <button type="submit" class="btn" id="saveBtn">Save person</button>
+            <button type="button" class="btn secondary" id="cancelEditBtn" style="display:none;">
+              Cancel edit
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "people-tracker-list-v1";
+
+    function loadPeople() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function savePeople(people) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+    }
+
+    function daysSince(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return null;
+      const now = new Date();
+      const diffMs = now - d;
+      return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    }
+
+    let people = loadPeople();
+
+    const peopleListEl = document.getElementById("peopleList");
+    const emptyStateEl = document.getElementById("emptyState");
+    const countMetaEl = document.getElementById("countMeta");
+    const searchInput = document.getElementById("searchInput");
+    const sortSelect = document.getElementById("sortSelect");
+    const resetDataBtn = document.getElementById("resetDataBtn");
+
+    const form = document.getElementById("personForm");
+    const editIndexInput = document.getElementById("editIndex");
+    const nameInput = document.getElementById("name");
+    const relationInput = document.getElementById("relation");
+    const locationInput = document.getElementById("location");
+    const lastContactInput = document.getElementById("lastContact");
+    const tagsInput = document.getElementById("tags");
+    const notesInput = document.getElementById("notes");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+    const saveBtn = document.getElementById("saveBtn");
+
+    function renderList() {
+      const searchTerm = searchInput.value.trim().toLowerCase();
+      const sortBy = sortSelect.value;
+
+      let filtered = people.filter((p) => {
+        const haystack = [
+          p.name,
+          p.relation,
+          p.location,
+          p.tags,
+          p.notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(searchTerm);
+      });
+
+      filtered.sort((a, b) => {
+        if (sortBy === "name") {
+          return a.name.localeCompare(b.name);
+        }
+        const da = a.lastContact ? new Date(a.lastContact) : null;
+        const db = b.lastContact ? new Date(b.lastContact) : null;
+
+        if (!da && !db) return a.name.localeCompare(b.name);
+        if (!da) return sortBy === "lastContactRecent" ? 1 : -1;
+        if (!db) return sortBy === "lastContactRecent" ? -1 : 1;
+
+        if (sortBy === "lastContactRecent") {
+          return db - da;
+        } else {
+          return da - db;
+        }
+      });
+
+      peopleListEl.innerHTML = "";
+      countMetaEl.textContent =
+        filtered.length + (filtered.length === 1 ? " person" : " people");
+
+      if (filtered.length === 0) {
+        emptyStateEl.style.display = "block";
+        return;
+      } else {
+        emptyStateEl.style.display = "none";
+      }
+
+      filtered.forEach((p, index) => {
+        const div = document.createElement("div");
+        div.className = "person";
+
+        const days = daysSince(p.lastContact);
+        let contactLabel = "No contact date set";
+        let badgeClass = "";
+        if (days === null) {
+          contactLabel = "No contact date set";
+        } else if (days <= 30) {
+          contactLabel = `Spoken ${days} day${days === 1 ? "" : "s"} ago`;
+          badgeClass = "ok";
+        } else if (days <= 90) {
+          contactLabel = `Spoken ${days} days ago`;
+        } else {
+          contactLabel = `It's been ${days} days`;
+        }
+
+        const showIndex = people.indexOf(p);
+
+        div.innerHTML = `
+          <div>
+            <div class="person-name">${p.name || "Unnamed"}</div>
+            <div class="person-relation">${p.relation || ""}</div>
+          </div>
+          <div>
+            ${
+              p.location
+                ? `<div class="person-location">${p.location}</div>`
+                : ""
+            }
+            <div>
+              ${
+                days === null
+                  ? `<span class="badge">No date</span>`
+                  : `<span class="badge ${badgeClass}">${contactLabel}</span>`
+              }
+              ${
+                p.lastContact
+                  ? `<span style="font-size:0.72rem;color:#6b7280;">(${p.lastContact})</span>`
+                  : ""
+              }
+            </div>
+          </div>
+          <div>
+            ${
+              p.tags
+                ? p.tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .map((t) => `<span class="tag">${t}</span>`)
+                    .join("")
+                : ""
+            }
+            ${
+              p.notes
+                ? `<div class="person-notes">${p.notes}</div>`
+                : ""
+            }
+            <div style="margin-top:0.3rem; font-size:0.75rem;">
+              <span class="danger" data-action="edit" data-index="${showIndex}">Edit</span>
+              &nbsp;•&nbsp;
+              <span class="danger" data-action="delete" data-index="${showIndex}">Delete</span>
+            </div>
+          </div>
+        `;
+
+        peopleListEl.appendChild(div);
+      });
+    }
+
+    peopleListEl.addEventListener("click", (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const action = target.getAttribute("data-action");
+      const indexStr = target.getAttribute("data-index");
+      if (!action || indexStr === null) return;
+
+      const index = parseInt(indexStr, 10);
+      if (Number.isNaN(index) || index < 0 || index >= people.length) return;
+
+      if (action === "edit") {
+        const p = people[index];
+        editIndexInput.value = index;
+        nameInput.value = p.name || "";
+        relationInput.value = p.relation || "";
+        locationInput.value = p.location || "";
+        lastContactInput.value = p.lastContact || "";
+        tagsInput.value = p.tags || "";
+        notesInput.value = p.notes || "";
+        saveBtn.textContent = "Update person";
+        cancelEditBtn.style.display = "inline-flex";
+        nameInput.focus();
+      } else if (action === "delete") {
+        if (confirm(`Delete ${people[index].name || "this person"}?`)) {
+          people.splice(index, 1);
+          savePeople(people);
+          renderList();
+          resetForm();
+        }
+      }
+    });
+
+    function resetForm() {
+      editIndexInput.value = "";
+      form.reset();
+      saveBtn.textContent = "Save person";
+      cancelEditBtn.style.display = "none";
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const person = {
+        name: nameInput.value.trim(),
+        relation: relationInput.value.trim(),
+        location: locationInput.value.trim(),
+        lastContact: lastContactInput.value || "",
+        tags: tagsInput.value.trim(),
+        notes: notesInput.value.trim(),
+      };
+
+      if (!person.name) {
+        alert("Name is required.");
+        return;
+      }
+
+      const editIndex = editIndexInput.value;
+      if (editIndex !== "") {
+        const idx = parseInt(editIndex, 10);
+        if (!Number.isNaN(idx) && idx >= 0 && idx < people.length) {
+          people[idx] = person;
+        }
+      } else {
+        people.push(person);
+      }
+
+      savePeople(people);
+      renderList();
+      resetForm();
+    });
+
+    cancelEditBtn.addEventListener("click", () => {
+      resetForm();
+    });
+
+    searchInput.addEventListener("input", renderList);
+    sortSelect.addEventListener("change", renderList);
+
+    resetDataBtn.addEventListener("click", () => {
+      if (confirm("This will delete ALL saved people in this browser. Continue?")) {
+        people = [];
+        savePeople(people);
+        renderList();
+        resetForm();
+      }
+    });
+
+    // Initial render
+    renderList();
+  </script>
+</body>
+</html>
