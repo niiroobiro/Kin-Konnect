@@ -539,7 +539,12 @@
         <div style="margin-top:1rem;">
           <div class="controls-top">
             <div class="search">
-              <input type="text" id="searchInput" placeholder="Search by name, town, phone..." />
+              <div style="display:flex; gap:0.4rem;">
+                <input type="text" id="searchInput" placeholder="Search by name, town, phone..." />
+                <button type="button" class="btn small secondary" id="searchBtn">
+                  Search
+                </button>
+              </div>
             </div>
             <div class="badge" id="summaryBadge">0 classmates stored</div>
           </div>
@@ -766,6 +771,7 @@
     const cancelEditBtn = document.getElementById("cancelEditBtn");
 
     const searchInput = document.getElementById("searchInput");
+    const searchBtn = document.getElementById("searchBtn");
     const classmateListEl = document.getElementById("classmateList");
     const emptyListEl = document.getElementById("emptyList");
     const summaryBadge = document.getElementById("summaryBadge");
@@ -840,18 +846,19 @@
       const proximity = computeProximity();
 
       let filtered = classmates;
-      if (selectedTown) {
-        filtered = filtered.filter((c) => c.town === selectedTown);
-      }
 
+      // If searching, search globally across all classmates
       if (term) {
-        filtered = filtered.filter((c) => {
+        filtered = classmates.filter((c) => {
           const haystack = [c.name, c.phone, c.town, c.place, c.notes]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
           return haystack.includes(term);
         });
+      } else if (selectedTown) {
+        // If no search term, limit to selected town
+        filtered = classmates.filter((c) => c.town === selectedTown);
       }
 
       classmateListEl.innerHTML = "";
@@ -1077,8 +1084,22 @@
       }
     });
 
+    // Live filter while typing (optional but nice)
     searchInput.addEventListener("input", () => {
       renderClassmateList();
+    });
+
+    // Click Search button triggers search
+    searchBtn.addEventListener("click", () => {
+      renderClassmateList();
+    });
+
+    // Press Enter in search box
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        renderClassmateList();
+      }
     });
 
     demoBtn.addEventListener("click", () => {
